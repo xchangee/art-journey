@@ -462,6 +462,7 @@ const musicTracks = [
 
 const heroImage = document.querySelector("#heroImage");
 const heroVideo = document.querySelector("#heroVideo");
+const stageTransition = document.querySelector("#stageTransition");
 const artistLabel = document.querySelector("#artistLabel");
 const titleLabel = document.querySelector("#titleLabel");
 const yearLabel = document.querySelector("#yearLabel");
@@ -479,7 +480,9 @@ const startExploreButton = document.querySelector("#startExplore");
 const mainStage = document.querySelector("#mainStage");
 
 let activeIndex = 0;
+let visibleArtworkIndex = 0;
 let switchTimer;
+let transitionCleanupTimer;
 let mediaSwitchId = 0;
 let railScrollTimer;
 let railIntroTimer;
@@ -727,22 +730,46 @@ function cleanTitle(artwork) {
   return artwork.title.replaceAll(" ", "");
 }
 
-function beginMediaSwitch() {
+function beginMediaSwitch(previousArtwork) {
   window.clearTimeout(switchTimer);
-  heroImage.classList.add("is-switching");
-  heroVideo.classList.add("is-switching");
+  window.clearTimeout(transitionCleanupTimer);
+
+  const hasVisibleMedia =
+    heroImage.classList.contains("is-visible") || heroVideo.classList.contains("is-visible");
+  if (!stageTransition || !hasVisibleMedia || !previousArtwork) return;
+
+  stageTransition.style.backgroundImage = `url("${imagePath(previousArtwork)}")`;
+  stageTransition.classList.remove("is-fading");
+  stageTransition.classList.add("is-visible");
+  stageTransition.getBoundingClientRect();
 }
 
-function finishMediaSwitch(activeElement) {
+function hideTransitionOverlay() {
+  if (!stageTransition || !stageTransition.classList.contains("is-visible")) return;
+
+  window.clearTimeout(transitionCleanupTimer);
+  window.requestAnimationFrame(() => {
+    stageTransition.classList.add("is-fading");
+    transitionCleanupTimer = window.setTimeout(() => {
+      stageTransition.classList.remove("is-visible", "is-fading");
+      stageTransition.style.backgroundImage = "";
+    }, 820);
+  });
+}
+
+function finishMediaSwitch(activeElement, displayedIndex) {
   const inactiveElement = activeElement === heroImage ? heroVideo : heroImage;
 
   inactiveElement.classList.remove("is-visible", "is-switching");
   activeElement.classList.add("is-visible");
+  visibleArtworkIndex = displayedIndex;
 
   switchTimer = window.setTimeout(() => {
     heroImage.classList.remove("is-switching");
     heroVideo.classList.remove("is-switching");
   }, 90);
+
+  hideTransitionOverlay();
 }
 
 function stopHeroVideo() {
@@ -752,48 +779,86 @@ function stopHeroVideo() {
   heroVideo.load();
 }
 
-function showImageArtwork(artwork, switchId) {
+function showImageArtwork(artwork, switchId, artworkIndex) {
   const nextSrc = imagePath(artwork);
   const loader = new Image();
 
-  loader.onload = () => {
+  loader.onload = async () => {
     if (switchId !== mediaSwitchId) return;
+    if (loader.decode) {
+      await loader.decode().catch(() => {});
+      if (switchId !== mediaSwitchId) return;
+    }
 
     stopHeroVideo();
     heroImage.src = nextSrc;
     heroImage.alt = cleanTitle(artwork);
-    finishMediaSwitch(heroImage);
+    finishMediaSwitch(heroImage, artworkIndex);
   };
 
   loader.src = nextSrc;
 }
 
-function showVideoArtwork(artwork, switchId) {
+function showVideoArtwork(artwork, switchId, artworkIndex) {
   const posterSrc = imagePath(artwork);
   const nextSrc = videoPath(artwork);
+  const posterLoader = new Image();
+  let isPosterVisible = false;
+  let isVideoReady = false;
+
+  const playVideo = () => {
+    const playPromise = heroVideo.play();
+    if (playPromise) {
+      playPromise.catch(() => {});
+    }
+  };
+
+  const revealVideo = () => {
+    if (switchId !== mediaSwitchId || !isPosterVisible || !isVideoReady) return;
+
+    finishMediaSwitch(heroVideo, artworkIndex);
+    playVideo();
+  };
 
   heroVideo.addEventListener(
     "error",
     () => {
       if (switchId === mediaSwitchId) {
-        showImageArtwork(artwork, switchId);
+        showImageArtwork(artwork, switchId, artworkIndex);
       }
     },
     { once: true }
   );
 
-  heroImage.src = posterSrc;
-  heroImage.alt = cleanTitle(artwork);
+  heroVideo.addEventListener(
+    "loadeddata",
+    () => {
+      isVideoReady = true;
+      revealVideo();
+    },
+    { once: true }
+  );
+
   keepVideoSilent(heroVideo);
   heroVideo.poster = posterSrc;
   heroVideo.src = nextSrc;
   heroVideo.load();
-  finishMediaSwitch(heroVideo);
 
-  const playPromise = heroVideo.play();
-  if (playPromise) {
-    playPromise.catch(() => {});
-  }
+  posterLoader.onload = async () => {
+    if (switchId !== mediaSwitchId) return;
+    if (posterLoader.decode) {
+      await posterLoader.decode().catch(() => {});
+      if (switchId !== mediaSwitchId) return;
+    }
+
+    heroImage.src = posterSrc;
+    heroImage.alt = cleanTitle(artwork);
+    finishMediaSwitch(heroImage, artworkIndex);
+    isPosterVisible = true;
+    revealVideo();
+  };
+
+  posterLoader.src = posterSrc;
 }
 
 function renderGallery() {
@@ -910,16 +975,21 @@ function wheelToHorizontalScroll(event) {
 
 function setActiveArtwork(index, shouldScroll = true) {
   const normalizedIndex = (index + artworks.length) % artworks.length;
+  const hasVisibleMedia =
+    heroImage.classList.contains("is-visible") || heroVideo.classList.contains("is-visible");
+  if (normalizedIndex === activeIndex && hasVisibleMedia) return;
+
   const artwork = artworks[normalizedIndex];
+  const previousArtwork = artworks[visibleArtworkIndex];
   activeIndex = normalizedIndex;
 
   const switchId = ++mediaSwitchId;
-  beginMediaSwitch();
+  beginMediaSwitch(previousArtwork);
 
   if (artwork.video) {
-    showVideoArtwork(artwork, switchId);
+    showVideoArtwork(artwork, switchId, normalizedIndex);
   } else {
-    showImageArtwork(artwork, switchId);
+    showImageArtwork(artwork, switchId, normalizedIndex);
   }
 
   artistLabel.textContent = artwork.artist;
