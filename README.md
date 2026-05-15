@@ -16,7 +16,7 @@ Art Journey 是一个以世界名画为主题的沉浸式网页画廊。项目�
 - 动态素材：部分名画配套 MP4 动态版本，切换时自动判断图片或视频展示。
 - 背景音乐：内置三首古典音乐，可在页面右上角播放或暂停。
 - 响应式设计：针对桌面端、平板和手机做了布局适配。
-- 静态构建：提供 `scripts/build-static.mjs`，可将源码和素材复制到 `dist/` 目录，并支持替换 CDN 资源前缀。
+- 静态构建：提供 `scripts/build-static.mjs`，可将源码和素材复制到 `dist/` 目录。
 
 ## 项目制作过程
 
@@ -36,7 +36,7 @@ Art Journey 是一个以世界名画为主题的沉浸式网页画廊。项目�
    `styles.css` 定义整体视觉系统，包括深色展厅背景、暖金色强调色、古典字体、画面遮罩、按钮动效和响应式布局。
 
 6. 准备发布构建  
-   `scripts/build-static.mjs` 会生成可发布的 `dist/` 目录，并可通过 `ONE_STACK_ASSET_BASE` 环境变量把本地资源路径替换为线上 CDN 路径。
+   `scripts/build-static.mjs` 会生成可发布的 `dist/` 目录，方便部署到静态网页服务。
 
 ## 页面设计过程
 
@@ -80,16 +80,9 @@ npm run build
 
 构建结果会输出到 `dist/`。
 
-如果需要替换线上静态资源地址，可以设置：
-
-```bash
-ONE_STACK_ASSET_BASE=https://example.com/assets/ npm run build
-```
-
 ## 技术栈
 
 - HTML5
 - CSS3
 - JavaScript
 - 静态图片、视频和音频资源
-
