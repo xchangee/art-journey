@@ -1,0 +1,12 @@
+{
+  "name": "art-journey",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "rm -rf dist && mkdir -p dist/artworks dist/audio && cp index.html styles.css script.js dist/ && cp artworks/*.png artworks/sunflowers.mp4 artworks/the-third-class-carriage.mp4 dist/artworks/ && cp audio/*.mp3 dist/audio/",
+    "build:test": "pnpm build",
+    "build:gray": "pnpm build",
+    "build:prod": "pnpm build"
+  }
+}

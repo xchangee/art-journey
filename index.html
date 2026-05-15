@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Art Journey 沉浸式名画网页，使用本地 artworks 文件夹图片构建响应式画廊。"
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23110f08'/%3E%3Cpath d='M13 26h38M17 29v19M27 29v19M37 29v19M47 29v19M13 51h38M16 21 32 13l16 8M20 23h24' fill='none' stroke='%23f8edbc' stroke-width='4' stroke-linecap='square' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+    <title>Art Journey | 沉浸式名画画廊</title>
+    <link rel="preload" as="image" href="artworks/loading-cover.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section class="loading-screen" id="loadingScreen" aria-label="世界名画入口">
+      <h1 class="sr-only">世界名画</h1>
+      <div class="loading-screen__particles" id="loadingParticles" aria-hidden="true"></div>
+      <button class="loading-screen__start" id="startExplore" type="button">
+        <span class="loading-screen__ornament" aria-hidden="true"></span>
+        <span class="loading-screen__label">开启探索</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 12h13M13 6l6 6-6 6"></path>
+        </svg>
+        <span class="loading-screen__ornament" aria-hidden="true"></span>
+      </button>
+    </section>
+
+    <main class="stage" id="mainStage" aria-label="Art Journey 沉浸式画廊" tabindex="-1" inert aria-hidden="true">
+      <img class="stage__image" id="heroImage" alt="" />
+      <video
+        class="stage__video"
+        id="heroVideo"
+        muted
+        loop
+        playsinline
+        preload="metadata"
+        aria-hidden="true"
+      ></video>
+      <div class="stage__veil" aria-hidden="true"></div>
+
+      <header class="site-header">
+        <a class="brand" href="#" aria-label="Art Journey 首页">
+          <span class="brand__mark" aria-hidden="true">
+            <svg viewBox="0 0 40 40" role="img">
+              <path d="M5 14.5h30M8 17.5v14M16 17.5v14M24 17.5v14M32 17.5v14M5 33h30M7 10.5 20 5l13 5.5M10 12h20" />
+            </svg>
+          </span>
+          <span class="brand__text">
+            <strong>Art Journey</strong>
+            <small>穿越艺术的时光之旅</small>
+          </span>
+        </a>
+
+        <button
+          class="music-player"
+          id="musicPlayer"
+          type="button"
+          aria-label="播放背景音乐"
+          aria-pressed="false"
+        >
+          <span class="music-player__prefix">BGM</span>
+          <span class="music-player__track" id="musicTrackName">Gymnopédie No. 1</span>
+        </button>
+      </header>
+
+      <section class="hero-copy" aria-live="polite">
+        <p class="hero-copy__artist" id="artistLabel">VINCENT VAN GOGH</p>
+        <h1 id="titleLabel">向 日 葵</h1>
+        <div class="hero-copy__meta">
+          <p class="hero-copy__year" id="yearLabel">1888</p>
+          <p class="hero-copy__place">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 21s7-5.2 7-11a7 7 0 0 0-14 0c0 5.8 7 11 7 11Z"></path>
+              <circle cx="12" cy="10" r="2.4"></circle>
+            </svg>
+            <span id="placeLabel">梵高美术馆，阿姆斯特丹</span>
+          </p>
+        </div>
+        <p class="hero-copy__description" id="descriptionLabel">
+          梵高用炽热的色彩与奔放的笔触，描绘生命的热烈与希望的光芒。
+        </p>
+      </section>
+
+      <div class="next-zone">
+        <button class="round-next" type="button" id="nextButton" aria-label="下一幅作品">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h13M13 6l6 6-6 6"></path>
+          </svg>
+        </button>
+      </div>
+
+      <section class="gallery-rail" id="gallery" aria-label="作品缩略图">
+        <div class="thumb-track" id="thumbTrack"></div>
+        <div class="pager" id="pager" aria-label="作品页码"></div>
+      </section>
+
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>

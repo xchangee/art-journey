@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.DS_Store
+artworks/*.mp4
+!artworks/sunflowers.mp4
+!artworks/the-third-class-carriage.mp4
+ChatGPT Image*.png
