@@ -519,13 +519,14 @@ backgroundMusic.preload = "auto";
 backgroundMusic.volume = 0.55;
 
 const preloadRule = Object.freeze({
-  imageConcurrency: 4,
-  mobileImageConcurrency: 2,
-  videoConcurrency: 1,
+  imageConcurrency: 8,
+  mobileImageConcurrency: 4,
+  videoConcurrency: 2,
   mobileVideoConcurrency: 1,
-  nearbyArtworkRadius: 2,
-  idleTimeout: 600,
-  videoWarmupTimeout: 10000
+  audioConcurrency: 2,
+  idleTimeout: 400,
+  videoWarmupTimeout: 14000,
+  audioWarmupTimeout: 14000
 });
 
 const mediaPreloadState = {
@@ -533,13 +534,22 @@ const mediaPreloadState = {
   imageCache: new Map(),
   videoCache: new Map(),
   videoElements: new Map(),
+  audioCache: new Map(),
+  audioElements: new Map(),
   imagePreloadPromise: null,
   videoPreloadPromise: null,
+  audioPreloadPromise: null,
+  allPreloadPromise: null,
   imagesLoaded: 0,
   videosLoaded: 0,
+  audioLoaded: 0,
   imagesTotal: 0,
-  videosTotal: 0
+  videosTotal: 0,
+  audioTotal: 0
 };
+
+let isGalleryRendered = false;
+let isExperienceInitialized = false;
 
 const staticImageAssets = [
   assetPath("artworks/loading-cover.webp"),
@@ -569,38 +579,20 @@ function uniqueAssets(paths) {
   return [...new Set(paths.filter(Boolean))];
 }
 
-function getNearbyArtworks(centerIndex, radius = preloadRule.nearbyArtworkRadius) {
-  const indexes = new Set();
-
-  for (let offset = 0; offset <= radius; offset += 1) {
-    indexes.add((centerIndex + offset + artworks.length) % artworks.length);
-    indexes.add((centerIndex - offset + artworks.length) % artworks.length);
-  }
-
-  return [...indexes].map((index) => artworks[index]);
-}
-
-function artworkImageAssets(selection) {
+function artworkImageAssets(selection = artworks) {
   return uniqueAssets([
     ...selection.map(imagePath),
+    ...selection.map((artwork) => thumbPath(artwork, 240)),
     ...selection.map((artwork) => thumbPath(artwork, 480))
   ]);
 }
 
-function artworkVideoAssets(selection) {
+function artworkVideoAssets(selection = artworks) {
   return uniqueAssets(selection.map((artwork) => artwork.video && videoPath(artwork)));
 }
 
-function getConnectionInfo() {
-  return navigator.connection || navigator.webkitConnection || navigator.mozConnection || null;
-}
-
-function shouldPreloadHeavyMedia() {
-  const connection = getConnectionInfo();
-  if (!connection) return true;
-  if (connection.saveData) return false;
-
-  return !["slow-2g", "2g", "3g"].includes(connection.effectiveType);
+function audioAssets() {
+  return uniqueAssets(musicTracks.map((track) => assetPath(track.src)));
 }
 
 function getImagePreloadConcurrency() {
@@ -642,6 +634,10 @@ function markImagePreloaded() {
 
 function markVideoPreloaded() {
   mediaPreloadState.videosLoaded += 1;
+}
+
+function markAudioPreloaded() {
+  mediaPreloadState.audioLoaded += 1;
 }
 
 function getImagePreloadEntry(src) {
@@ -762,38 +758,57 @@ function preloadVideoAsset(src) {
   return promise;
 }
 
+function preloadAudioAsset(src) {
+  if (mediaPreloadState.audioCache.has(src)) {
+    return mediaPreloadState.audioCache.get(src);
+  }
+
+  const promise = new Promise((resolve) => {
+    const audio = new Audio();
+    let isSettled = false;
+
+    const finish = (isLoaded) => {
+      if (isSettled) return;
+      isSettled = true;
+      window.clearTimeout(timeoutId);
+      audio.removeEventListener("canplaythrough", handleLoaded);
+      audio.removeEventListener("loadeddata", handleLoaded);
+      audio.removeEventListener("error", handleError);
+      resolve({ src, isLoaded });
+    };
+
+    const handleLoaded = () => finish(true);
+    const handleError = () => finish(false);
+    const timeoutId = window.setTimeout(() => finish(audio.readyState > 0), preloadRule.audioWarmupTimeout);
+
+    audio.preload = "auto";
+    audio.addEventListener("canplaythrough", handleLoaded);
+    audio.addEventListener("loadeddata", handleLoaded);
+    audio.addEventListener("error", handleError);
+    audio.src = src;
+    mediaPreloadState.audioElements.set(src, audio);
+    audio.load();
+  }).then((result) => {
+    markAudioPreloaded();
+    return result;
+  });
+
+  mediaPreloadState.audioCache.set(src, promise);
+  return promise;
+}
+
 function beginSiteMediaPreload() {
-  if (mediaPreloadState.isStarted) return;
+  if (mediaPreloadState.isStarted) return mediaPreloadState.allPreloadPromise;
 
   mediaPreloadState.isStarted = true;
 
-  const nearbyArtworks = getNearbyArtworks(activeIndex);
-  const imageAssets = uniqueAssets([...staticImageAssets, ...artworkImageAssets(nearbyArtworks)]);
-  const videoAssets = artworkVideoAssets(nearbyArtworks);
+  const imageAssets = uniqueAssets([...staticImageAssets, ...artworkImageAssets()]);
+  const videoAssets = artworkVideoAssets();
+  const musicAssets = audioAssets();
 
   mediaPreloadState.imagesTotal = imageAssets.length;
   mediaPreloadState.videosTotal = videoAssets.length;
-
-  mediaPreloadState.imagePreloadPromise = runPreloadQueue(
-    imageAssets,
-    (src) => preloadImageAsset(src),
-    getImagePreloadConcurrency()
-  ).then(() => {
-    schedulePreloadWork(() => {
-      if (!shouldPreloadHeavyMedia()) return;
-
-      mediaPreloadState.videoPreloadPromise = runPreloadQueue(
-        videoAssets,
-        preloadVideoAsset,
-        getVideoPreloadConcurrency()
-      );
-    });
-  });
-}
-
-function preloadNearbyArtworkAssets(centerIndex) {
-  const nearbyArtworks = getNearbyArtworks(centerIndex);
-  const imageAssets = artworkImageAssets(nearbyArtworks);
+  mediaPreloadState.audioTotal = musicAssets.length;
 
   mediaPreloadState.imagePreloadPromise = runPreloadQueue(
     imageAssets,
@@ -801,15 +816,25 @@ function preloadNearbyArtworkAssets(centerIndex) {
     getImagePreloadConcurrency()
   );
 
-  if (!shouldPreloadHeavyMedia()) return;
+  mediaPreloadState.videoPreloadPromise = runPreloadQueue(
+    videoAssets,
+    preloadVideoAsset,
+    getVideoPreloadConcurrency()
+  );
 
-  schedulePreloadWork(() => {
-    mediaPreloadState.videoPreloadPromise = runPreloadQueue(
-      artworkVideoAssets(nearbyArtworks),
-      preloadVideoAsset,
-      getVideoPreloadConcurrency()
-    );
-  });
+  mediaPreloadState.audioPreloadPromise = runPreloadQueue(
+    musicAssets,
+    preloadAudioAsset,
+    preloadRule.audioConcurrency
+  );
+
+  mediaPreloadState.allPreloadPromise = Promise.allSettled([
+    mediaPreloadState.imagePreloadPromise,
+    mediaPreloadState.videoPreloadPromise,
+    mediaPreloadState.audioPreloadPromise
+  ]);
+
+  return mediaPreloadState.allPreloadPromise;
 }
 
 function seededValue(index, salt) {
@@ -992,7 +1017,7 @@ function showVideoArtwork(artwork, switchId, artworkIndex) {
   );
 
   keepVideoSilent(heroVideo);
-  heroVideo.preload = shouldPreloadHeavyMedia() ? "auto" : "metadata";
+  heroVideo.preload = "auto";
   heroVideo.poster = posterSrc;
   heroVideo.src = nextSrc;
   heroVideo.load();
@@ -1004,6 +1029,8 @@ function showVideoArtwork(artwork, switchId, artworkIndex) {
 }
 
 function renderGallery() {
+  if (isGalleryRendered) return;
+
   const thumbs = document.createDocumentFragment();
   const dots = document.createDocumentFragment();
 
@@ -1042,6 +1069,7 @@ function renderGallery() {
 
   thumbTrack.appendChild(thumbs);
   pager.appendChild(dots);
+  isGalleryRendered = true;
 }
 
 function centerThumbInRail(button) {
@@ -1165,10 +1193,6 @@ function setActiveArtwork(index, shouldScroll = true) {
   document.querySelectorAll(".pager button").forEach((button, buttonIndex) => {
     button.classList.toggle("is-active", buttonIndex === normalizedIndex);
   });
-
-  if (mediaPreloadState.isStarted) {
-    schedulePreloadWork(() => preloadNearbyArtworkAssets(normalizedIndex));
-  }
 }
 
 function resetStageSwipeGesture() {
@@ -1268,13 +1292,28 @@ function preventMobileDoubleTapZoom(event) {
   }
 }
 
-renderGallery();
+function initializeGalleryExperience() {
+  if (isExperienceInitialized) return;
+
+  isExperienceInitialized = true;
+  renderGallery();
+  setActiveArtwork(0, false);
+  updateRailProgress();
+  setMusicTrack(0);
+}
+
 renderLoadingParticles();
-setActiveArtwork(0, false);
-updateRailProgress();
-setMusicTrack(0);
+
+window.addEventListener(
+  "load",
+  () => {
+    schedulePreloadWork(beginSiteMediaPreload);
+  },
+  { once: true }
+);
 
 startExploreButton?.addEventListener("click", () => {
+  initializeGalleryExperience();
   enterGallery();
   beginSiteMediaPreload();
   playBackgroundMusic();
