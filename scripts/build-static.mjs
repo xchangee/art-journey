@@ -6,6 +6,15 @@ const distDir = "dist";
 const artworkDist = join(distDir, "artworks");
 const audioDist = join(distDir, "audio");
 const assetBase = process.env.ONE_STACK_ASSET_BASE || "";
+const cacheBust = process.env.ONE_STACK_CACHE_BUST || getGitShortHash();
+
+function getGitShortHash() {
+  try {
+    return execFileSync("git", ["rev-parse", "--short", "HEAD"]).toString("utf8").trim();
+  } catch {
+    return Date.now().toString(36);
+  }
+}
 
 rmSync(distDir, { recursive: true, force: true });
 mkdirSync(artworkDist, { recursive: true });
@@ -42,8 +51,8 @@ if (assetBase) {
 
   rewriteFile("index.html", (content, base) => content
     .replaceAll('href="artworks/', `href="${base}artworks/`)
-    .replace('href="styles.css"', `href="${base}styles.css"`)
-    .replace('src="script.js"', `src="${base}script.js"`));
+    .replace('href="styles.css"', `href="${base}styles.css?v=${cacheBust}"`)
+    .replace('src="script.js"', `src="${base}script.js?v=${cacheBust}"`));
 
   rewriteFile("styles.css", (content, base) => content
     .replaceAll('url("artworks/', `url("${base}artworks/`)
