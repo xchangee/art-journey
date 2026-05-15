@@ -550,6 +550,7 @@ const mediaPreloadState = {
 
 let isGalleryRendered = false;
 let isExperienceInitialized = false;
+const urgentPreloadLinks = new Map();
 
 const staticImageAssets = [
   assetPath("artworks/loading-cover.webp"),
@@ -640,9 +641,49 @@ function markAudioPreloaded() {
   mediaPreloadState.audioLoaded += 1;
 }
 
-function getImagePreloadEntry(src) {
+function setImageFetchPriority(image, fetchPriority) {
+  if (!fetchPriority || fetchPriority === "auto") return;
+
+  if ("fetchPriority" in image) {
+    image.fetchPriority = fetchPriority;
+    return;
+  }
+
+  image.setAttribute("fetchpriority", fetchPriority);
+}
+
+function setMediaFetchPriority(media, fetchPriority) {
+  if (!fetchPriority || fetchPriority === "auto") {
+    media.removeAttribute("fetchpriority");
+    return;
+  }
+
+  media.setAttribute("fetchpriority", fetchPriority);
+}
+
+function prioritizeAsset(src, as) {
+  if (!src || urgentPreloadLinks.has(src)) return;
+
+  const link = document.createElement("link");
+  link.rel = "preload";
+  link.href = src;
+  link.as = as;
+  link.fetchPriority = "high";
+  link.setAttribute("fetchpriority", "high");
+
+  if (as === "video") {
+    link.type = "video/mp4";
+  }
+
+  document.head.appendChild(link);
+  urgentPreloadLinks.set(src, link);
+}
+
+function getImagePreloadEntry(src, fetchPriority = "auto") {
   if (mediaPreloadState.imageCache.has(src)) {
-    return mediaPreloadState.imageCache.get(src);
+    const entry = mediaPreloadState.imageCache.get(src);
+    setImageFetchPriority(entry.image, fetchPriority);
+    return entry;
   }
 
   const image = new Image();
@@ -668,6 +709,7 @@ function getImagePreloadEntry(src) {
 
     image.decoding = "async";
     image.loading = "eager";
+    setImageFetchPriority(image, fetchPriority);
     image.onload = () => complete(true);
     image.onerror = () => complete(false);
     image.src = src;
@@ -684,8 +726,8 @@ function getImagePreloadEntry(src) {
   return entry;
 }
 
-function preloadImageAsset(src, shouldDecode = false) {
-  const entry = getImagePreloadEntry(src);
+function preloadImageAsset(src, shouldDecode = false, fetchPriority = "auto") {
+  const entry = getImagePreloadEntry(src, fetchPriority);
 
   return entry.loadPromise.then(async (result) => {
     if (result.isLoaded && shouldDecode && entry.image.decode) {
@@ -706,20 +748,12 @@ function isImageReady(src) {
   return entry?.isLoaded === true || entry?.isDecoded === true;
 }
 
-function revealPreviewArtwork(artwork, switchId, artworkIndex) {
-  if (switchId !== mediaSwitchId) return;
-
-  const previewSrc = thumbPath(artwork, 480);
-  heroVideo.pause();
-  heroImage.src = previewSrc;
-  heroImage.alt = cleanTitle(artwork);
-  finishMediaSwitch(heroImage, artworkIndex);
-  preloadImageAsset(previewSrc);
-}
-
-function preloadVideoAsset(src) {
+function preloadVideoAsset(src, fetchPriority = "auto") {
   if (mediaPreloadState.videoCache.has(src)) {
-    return mediaPreloadState.videoCache.get(src);
+    const promise = mediaPreloadState.videoCache.get(src);
+    const video = mediaPreloadState.videoElements.get(src);
+    if (video) setMediaFetchPriority(video, fetchPriority);
+    return promise;
   }
 
   const promise = new Promise((resolve) => {
@@ -743,6 +777,7 @@ function preloadVideoAsset(src) {
     keepVideoSilent(video);
     video.playsInline = true;
     video.preload = "auto";
+    setMediaFetchPriority(video, fetchPriority);
     video.addEventListener("canplaythrough", handleLoaded);
     video.addEventListener("loadeddata", handleLoaded);
     video.addEventListener("error", handleError);
@@ -939,17 +974,15 @@ function stopHeroVideo() {
   heroVideo.pause();
   heroVideo.removeAttribute("src");
   heroVideo.removeAttribute("poster");
+  heroVideo.removeAttribute("fetchpriority");
   heroVideo.load();
 }
 
 function showImageArtwork(artwork, switchId, artworkIndex) {
   const nextSrc = imagePath(artwork);
 
-  if (!isImageReady(nextSrc)) {
-    revealPreviewArtwork(artwork, switchId, artworkIndex);
-  }
-
-  preloadImageAsset(nextSrc, true).then(({ isLoaded }) => {
+  prioritizeAsset(nextSrc, "image");
+  preloadImageAsset(nextSrc, true, "high").then(({ isLoaded }) => {
     if (!isLoaded) return;
     if (switchId !== mediaSwitchId) return;
 
@@ -961,9 +994,7 @@ function showImageArtwork(artwork, switchId, artworkIndex) {
 }
 
 function showVideoArtwork(artwork, switchId, artworkIndex) {
-  const posterSrc = imagePath(artwork);
   const nextSrc = videoPath(artwork);
-  let isPosterVisible = false;
   let isVideoReady = false;
   let isVideoVisible = false;
 
@@ -975,27 +1006,12 @@ function showVideoArtwork(artwork, switchId, artworkIndex) {
   };
 
   const revealVideo = () => {
-    if (switchId !== mediaSwitchId || !isPosterVisible || !isVideoReady) return;
+    if (switchId !== mediaSwitchId || !isVideoReady) return;
 
     isVideoVisible = true;
     finishMediaSwitch(heroVideo, artworkIndex);
     playVideo();
   };
-
-  const revealPoster = () => {
-    if (switchId !== mediaSwitchId || isVideoVisible) return;
-
-    heroImage.src = posterSrc;
-    heroImage.alt = cleanTitle(artwork);
-    finishMediaSwitch(heroImage, artworkIndex);
-    isPosterVisible = true;
-    revealVideo();
-  };
-
-  if (!isImageReady(posterSrc)) {
-    revealPreviewArtwork(artwork, switchId, artworkIndex);
-    isPosterVisible = true;
-  }
 
   heroVideo.addEventListener(
     "error",
@@ -1018,14 +1034,12 @@ function showVideoArtwork(artwork, switchId, artworkIndex) {
 
   keepVideoSilent(heroVideo);
   heroVideo.preload = "auto";
-  heroVideo.poster = posterSrc;
+  heroVideo.removeAttribute("poster");
+  setMediaFetchPriority(heroVideo, "high");
+  prioritizeAsset(nextSrc, "video");
   heroVideo.src = nextSrc;
   heroVideo.load();
-
-  preloadImageAsset(posterSrc, true).then(({ isLoaded }) => {
-    if (!isLoaded) return;
-    revealPoster();
-  });
+  preloadVideoAsset(nextSrc, "high");
 }
 
 function renderGallery() {
@@ -1157,11 +1171,11 @@ function wheelToHorizontalScroll(event) {
   pulseRailScroll();
 }
 
-function setActiveArtwork(index, shouldScroll = true) {
+function setActiveArtwork(index, shouldScroll = true, options = {}) {
   const normalizedIndex = (index + artworks.length) % artworks.length;
   const hasVisibleMedia =
     heroImage.classList.contains("is-visible") || heroVideo.classList.contains("is-visible");
-  if (normalizedIndex === activeIndex && hasVisibleMedia) return;
+  if (normalizedIndex === activeIndex && hasVisibleMedia && !options.forceRefresh) return;
 
   const artwork = artworks[normalizedIndex];
   const previousArtwork = artworks[visibleArtworkIndex];
@@ -1303,14 +1317,7 @@ function initializeGalleryExperience() {
 }
 
 renderLoadingParticles();
-
-window.addEventListener(
-  "load",
-  () => {
-    schedulePreloadWork(beginSiteMediaPreload);
-  },
-  { once: true }
-);
+beginSiteMediaPreload();
 
 startExploreButton?.addEventListener("click", () => {
   initializeGalleryExperience();
@@ -1325,7 +1332,7 @@ thumbTrack.addEventListener("scroll", updateRailProgress, { passive: true });
 thumbTrack.addEventListener("click", (event) => {
   const button = event.target.closest(".thumb-card");
   if (!button) return;
-  setActiveArtwork(Number(button.dataset.index));
+  setActiveArtwork(Number(button.dataset.index), true, { forceRefresh: true });
 });
 
 pager.addEventListener("click", (event) => {
