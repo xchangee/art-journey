@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "npx serve .",
-    "build": "node scripts/build-static.mjs"
+    "build": "node scripts/build-static.mjs",
+    "build:test": "ONE_STACK_ASSET_BASE=https://static0-test.xesimg.com/one-stack-platform/test/mzaBvJ/ pnpm build",
+    "build:gray": "ONE_STACK_ASSET_BASE=https://static0.xesimg.com/one-stack-platform/gray/mzaBvJ/ pnpm build",
+    "build:prod": "ONE_STACK_ASSET_BASE=https://static0.xesimg.com/one-stack-platform/production/mzaBvJ/ pnpm build"
   }
 }
