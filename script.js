@@ -947,7 +947,6 @@ setActiveArtwork(0, false);
 updateRailProgress();
 setMusicTrack(0);
 beginSiteMediaPreload();
-showInitialRailHint();
 
 startExploreButton?.addEventListener("click", () => {
   enterGallery();
