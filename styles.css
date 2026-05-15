@@ -1083,7 +1083,7 @@ a {
   justify-content: center;
   gap: clamp(10px, 0.8cqw, 16px);
   min-height: clamp(14px, 2cqh, 18px);
-  overflow: hidden;
+  overflow: visible;
   pointer-events: auto;
 }
 
@@ -1134,9 +1134,13 @@ a {
 .pager button {
   position: relative;
   z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 6px;
   height: 6px;
   padding: 0;
+  overflow: visible;
   border: 0;
   border-radius: 999px;
   background: rgba(255, 248, 223, 0.32);
@@ -1151,6 +1155,29 @@ a {
     box-shadow 220ms ease,
     opacity 220ms ease,
     transform 220ms ease;
+}
+
+.pager__label {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  z-index: 2;
+  max-width: clamp(46px, 5.2cqw, 74px);
+  overflow: hidden;
+  color: rgba(255, 248, 223, 0.78);
+  font-family: var(--sans);
+  font-size: clamp(7px, 1.05cqh, 9px);
+  line-height: 1.1;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 3px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
 }
 
 .pager button::before {
@@ -1181,6 +1208,12 @@ a {
     0 0 0 1px rgba(255, 250, 198, 0.22),
     0 0 14px rgba(255, 230, 109, 0.82),
     0 0 26px rgba(120, 229, 255, 0.35);
+}
+
+.pager button:hover .pager__label,
+.pager button:focus-visible .pager__label {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .pager button.is-active::before,

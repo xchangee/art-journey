@@ -519,11 +519,13 @@ backgroundMusic.preload = "auto";
 backgroundMusic.volume = 0.55;
 
 const preloadRule = Object.freeze({
-  priorityImageCount: 10,
-  imageConcurrency: 5,
+  imageConcurrency: 4,
+  mobileImageConcurrency: 2,
   videoConcurrency: 1,
-  idleTimeout: 700,
-  videoWarmupTimeout: 14000
+  mobileVideoConcurrency: 1,
+  nearbyArtworkRadius: 2,
+  idleTimeout: 600,
+  videoWarmupTimeout: 10000
 });
 
 const mediaPreloadState = {
@@ -531,6 +533,8 @@ const mediaPreloadState = {
   imageCache: new Map(),
   videoCache: new Map(),
   videoElements: new Map(),
+  imagePreloadPromise: null,
+  videoPreloadPromise: null,
   imagesLoaded: 0,
   videosLoaded: 0,
   imagesTotal: 0,
@@ -563,6 +567,48 @@ function keepVideoSilent(video) {
 
 function uniqueAssets(paths) {
   return [...new Set(paths.filter(Boolean))];
+}
+
+function getNearbyArtworks(centerIndex, radius = preloadRule.nearbyArtworkRadius) {
+  const indexes = new Set();
+
+  for (let offset = 0; offset <= radius; offset += 1) {
+    indexes.add((centerIndex + offset + artworks.length) % artworks.length);
+    indexes.add((centerIndex - offset + artworks.length) % artworks.length);
+  }
+
+  return [...indexes].map((index) => artworks[index]);
+}
+
+function artworkImageAssets(selection) {
+  return uniqueAssets([
+    ...selection.map(imagePath),
+    ...selection.map((artwork) => thumbPath(artwork, 480))
+  ]);
+}
+
+function artworkVideoAssets(selection) {
+  return uniqueAssets(selection.map((artwork) => artwork.video && videoPath(artwork)));
+}
+
+function getConnectionInfo() {
+  return navigator.connection || navigator.webkitConnection || navigator.mozConnection || null;
+}
+
+function shouldPreloadHeavyMedia() {
+  const connection = getConnectionInfo();
+  if (!connection) return true;
+  if (connection.saveData) return false;
+
+  return !["slow-2g", "2g", "3g"].includes(connection.effectiveType);
+}
+
+function getImagePreloadConcurrency() {
+  return mobileSwipeMedia.matches ? preloadRule.mobileImageConcurrency : preloadRule.imageConcurrency;
+}
+
+function getVideoPreloadConcurrency() {
+  return mobileSwipeMedia.matches ? preloadRule.mobileVideoConcurrency : preloadRule.videoConcurrency;
 }
 
 function runPreloadQueue(items, worker, concurrency) {
@@ -598,21 +644,28 @@ function markVideoPreloaded() {
   mediaPreloadState.videosLoaded += 1;
 }
 
-function preloadImageAsset(src, shouldDecode = false) {
+function getImagePreloadEntry(src) {
   if (mediaPreloadState.imageCache.has(src)) {
     return mediaPreloadState.imageCache.get(src);
   }
 
-  const promise = new Promise((resolve) => {
-    const image = new Image();
-    let isSettled = false;
-    const complete = async (isLoaded) => {
+  const image = new Image();
+  let isSettled = false;
+  const entry = {
+    image,
+    isLoaded: false,
+    isDecoded: false,
+    decodePromise: null,
+    loadPromise: null
+  };
+
+  entry.loadPromise = new Promise((resolve) => {
+    const complete = (isLoaded) => {
       if (isSettled) return;
       isSettled = true;
-
-      if (isLoaded && shouldDecode && image.decode) {
-        await image.decode().catch(() => {});
-      }
+      image.onload = null;
+      image.onerror = null;
+      entry.isLoaded = isLoaded;
 
       resolve({ src, isLoaded });
     };
@@ -631,8 +684,41 @@ function preloadImageAsset(src, shouldDecode = false) {
     return result;
   });
 
-  mediaPreloadState.imageCache.set(src, promise);
-  return promise;
+  mediaPreloadState.imageCache.set(src, entry);
+  return entry;
+}
+
+function preloadImageAsset(src, shouldDecode = false) {
+  const entry = getImagePreloadEntry(src);
+
+  return entry.loadPromise.then(async (result) => {
+    if (result.isLoaded && shouldDecode && entry.image.decode) {
+      entry.decodePromise = entry.decodePromise || entry.image.decode().catch(() => {});
+      await entry.decodePromise;
+    }
+
+    if (result.isLoaded && shouldDecode) {
+      entry.isDecoded = true;
+    }
+
+    return result;
+  });
+}
+
+function isImageReady(src) {
+  const entry = mediaPreloadState.imageCache.get(src);
+  return entry?.isLoaded === true || entry?.isDecoded === true;
+}
+
+function revealPreviewArtwork(artwork, switchId, artworkIndex) {
+  if (switchId !== mediaSwitchId) return;
+
+  const previewSrc = thumbPath(artwork, 480);
+  heroVideo.pause();
+  heroImage.src = previewSrc;
+  heroImage.alt = cleanTitle(artwork);
+  finishMediaSwitch(heroImage, artworkIndex);
+  preloadImageAsset(previewSrc);
 }
 
 function preloadVideoAsset(src) {
@@ -681,27 +767,48 @@ function beginSiteMediaPreload() {
 
   mediaPreloadState.isStarted = true;
 
-  const imageAssets = uniqueAssets([...staticImageAssets, ...artworks.map(imagePath)]);
-  const videoAssets = uniqueAssets(artworks.map((artwork) => artwork.video && videoPath(artwork)));
-  const priorityImages = imageAssets.slice(0, preloadRule.priorityImageCount);
-  const backgroundImages = imageAssets.slice(preloadRule.priorityImageCount);
+  const nearbyArtworks = getNearbyArtworks(activeIndex);
+  const imageAssets = uniqueAssets([...staticImageAssets, ...artworkImageAssets(nearbyArtworks)]);
+  const videoAssets = artworkVideoAssets(nearbyArtworks);
 
   mediaPreloadState.imagesTotal = imageAssets.length;
   mediaPreloadState.videosTotal = videoAssets.length;
 
-  runPreloadQueue(
-    priorityImages,
-    (src) => preloadImageAsset(src, true),
-    preloadRule.imageConcurrency
+  mediaPreloadState.imagePreloadPromise = runPreloadQueue(
+    imageAssets,
+    (src) => preloadImageAsset(src),
+    getImagePreloadConcurrency()
   ).then(() => {
     schedulePreloadWork(() => {
-      runPreloadQueue(
-        backgroundImages,
-        (src) => preloadImageAsset(src),
-        preloadRule.imageConcurrency
+      if (!shouldPreloadHeavyMedia()) return;
+
+      mediaPreloadState.videoPreloadPromise = runPreloadQueue(
+        videoAssets,
+        preloadVideoAsset,
+        getVideoPreloadConcurrency()
       );
-      runPreloadQueue(videoAssets, preloadVideoAsset, preloadRule.videoConcurrency);
     });
+  });
+}
+
+function preloadNearbyArtworkAssets(centerIndex) {
+  const nearbyArtworks = getNearbyArtworks(centerIndex);
+  const imageAssets = artworkImageAssets(nearbyArtworks);
+
+  mediaPreloadState.imagePreloadPromise = runPreloadQueue(
+    imageAssets,
+    (src) => preloadImageAsset(src),
+    getImagePreloadConcurrency()
+  );
+
+  if (!shouldPreloadHeavyMedia()) return;
+
+  schedulePreloadWork(() => {
+    mediaPreloadState.videoPreloadPromise = runPreloadQueue(
+      artworkVideoAssets(nearbyArtworks),
+      preloadVideoAsset,
+      getVideoPreloadConcurrency()
+    );
   });
 }
 
@@ -812,30 +919,28 @@ function stopHeroVideo() {
 
 function showImageArtwork(artwork, switchId, artworkIndex) {
   const nextSrc = imagePath(artwork);
-  const loader = new Image();
 
-  loader.onload = async () => {
+  if (!isImageReady(nextSrc)) {
+    revealPreviewArtwork(artwork, switchId, artworkIndex);
+  }
+
+  preloadImageAsset(nextSrc, true).then(({ isLoaded }) => {
+    if (!isLoaded) return;
     if (switchId !== mediaSwitchId) return;
-    if (loader.decode) {
-      await loader.decode().catch(() => {});
-      if (switchId !== mediaSwitchId) return;
-    }
 
     stopHeroVideo();
     heroImage.src = nextSrc;
     heroImage.alt = cleanTitle(artwork);
     finishMediaSwitch(heroImage, artworkIndex);
-  };
-
-  loader.src = nextSrc;
+  });
 }
 
 function showVideoArtwork(artwork, switchId, artworkIndex) {
   const posterSrc = imagePath(artwork);
   const nextSrc = videoPath(artwork);
-  const posterLoader = new Image();
   let isPosterVisible = false;
   let isVideoReady = false;
+  let isVideoVisible = false;
 
   const playVideo = () => {
     const playPromise = heroVideo.play();
@@ -847,9 +952,25 @@ function showVideoArtwork(artwork, switchId, artworkIndex) {
   const revealVideo = () => {
     if (switchId !== mediaSwitchId || !isPosterVisible || !isVideoReady) return;
 
+    isVideoVisible = true;
     finishMediaSwitch(heroVideo, artworkIndex);
     playVideo();
   };
+
+  const revealPoster = () => {
+    if (switchId !== mediaSwitchId || isVideoVisible) return;
+
+    heroImage.src = posterSrc;
+    heroImage.alt = cleanTitle(artwork);
+    finishMediaSwitch(heroImage, artworkIndex);
+    isPosterVisible = true;
+    revealVideo();
+  };
+
+  if (!isImageReady(posterSrc)) {
+    revealPreviewArtwork(artwork, switchId, artworkIndex);
+    isPosterVisible = true;
+  }
 
   heroVideo.addEventListener(
     "error",
@@ -871,25 +992,15 @@ function showVideoArtwork(artwork, switchId, artworkIndex) {
   );
 
   keepVideoSilent(heroVideo);
+  heroVideo.preload = shouldPreloadHeavyMedia() ? "auto" : "metadata";
   heroVideo.poster = posterSrc;
   heroVideo.src = nextSrc;
   heroVideo.load();
 
-  posterLoader.onload = async () => {
-    if (switchId !== mediaSwitchId) return;
-    if (posterLoader.decode) {
-      await posterLoader.decode().catch(() => {});
-      if (switchId !== mediaSwitchId) return;
-    }
-
-    heroImage.src = posterSrc;
-    heroImage.alt = cleanTitle(artwork);
-    finishMediaSwitch(heroImage, artworkIndex);
-    isPosterVisible = true;
-    revealVideo();
-  };
-
-  posterLoader.src = posterSrc;
+  preloadImageAsset(posterSrc, true).then(({ isLoaded }) => {
+    if (!isLoaded) return;
+    revealPoster();
+  });
 }
 
 function renderGallery() {
@@ -918,7 +1029,14 @@ function renderGallery() {
     const dot = document.createElement("button");
     dot.type = "button";
     dot.dataset.index = String(index);
-    dot.setAttribute("aria-label", `第 ${index + 1} 幅`);
+    dot.setAttribute("aria-label", `跳转到作品：${cleanTitle(artwork)}`);
+
+    const dotLabel = document.createElement("span");
+    dotLabel.className = "pager__label";
+    dotLabel.setAttribute("aria-hidden", "true");
+    dotLabel.textContent = cleanTitle(artwork);
+    dot.appendChild(dotLabel);
+
     dots.appendChild(dot);
   });
 
@@ -1047,6 +1165,10 @@ function setActiveArtwork(index, shouldScroll = true) {
   document.querySelectorAll(".pager button").forEach((button, buttonIndex) => {
     button.classList.toggle("is-active", buttonIndex === normalizedIndex);
   });
+
+  if (mediaPreloadState.isStarted) {
+    schedulePreloadWork(() => preloadNearbyArtworkAssets(normalizedIndex));
+  }
 }
 
 function resetStageSwipeGesture() {
@@ -1151,10 +1273,10 @@ renderLoadingParticles();
 setActiveArtwork(0, false);
 updateRailProgress();
 setMusicTrack(0);
-beginSiteMediaPreload();
 
 startExploreButton?.addEventListener("click", () => {
   enterGallery();
+  beginSiteMediaPreload();
   playBackgroundMusic();
 });
 
