@@ -520,14 +520,6 @@ backgroundMusic.volume = 0.55;
 
 let isGalleryRendered = false;
 let isExperienceInitialized = false;
-let hasStartedFullDownload = false;
-const fullDownloadLinks = [];
-
-const staticImageAssets = [
-  assetPath("artworks/loading-cover.webp"),
-  assetPath("artworks/loading-cover-mobile.webp"),
-  assetPath("artworks/art-journey-preview.png")
-];
 
 function imagePath(artwork) {
   return assetPath(`${basePath}${artwork.file}`);
@@ -545,87 +537,6 @@ function keepVideoSilent(video) {
   video.defaultMuted = true;
   video.muted = true;
   video.volume = 0;
-}
-
-function uniqueAssets(paths) {
-  return [...new Set(paths.filter(Boolean))];
-}
-
-function artworkImageAssets(selection = artworks) {
-  return uniqueAssets([
-    ...selection.map(imagePath),
-    ...selection.map((artwork) => thumbPath(artwork, 240)),
-    ...selection.map((artwork) => thumbPath(artwork, 480))
-  ]);
-}
-
-function artworkVideoAssets(selection = artworks) {
-  return uniqueAssets(selection.map((artwork) => artwork.video && videoPath(artwork)));
-}
-
-function audioAssets() {
-  return uniqueAssets(musicTracks.map((track) => assetPath(track.src)));
-}
-
-function allMediaAssets() {
-  return uniqueAssets([
-    ...staticImageAssets,
-    ...artworkImageAssets(),
-    ...artworkVideoAssets(),
-    ...audioAssets()
-  ]);
-}
-
-function isImageAsset(src) {
-  return /\.(png|webp|jpe?g|gif|svg)(?:[?#].*)?$/i.test(src);
-}
-
-function isVideoAsset(src) {
-  return /\.mp4(?:[?#].*)?$/i.test(src);
-}
-
-function isAudioAsset(src) {
-  return /\.mp3(?:[?#].*)?$/i.test(src);
-}
-
-function assetHintType(src) {
-  if (isImageAsset(src)) {
-    return "image";
-  }
-
-  if (isVideoAsset(src)) {
-    return "video";
-  }
-
-  if (isAudioAsset(src)) {
-    return "audio";
-  }
-
-  return null;
-}
-
-function startAssetDownload(src) {
-  const as = assetHintType(src);
-  if (!as) return null;
-
-  const link = document.createElement("link");
-  link.rel = "prefetch";
-  link.href = src;
-  link.as = as;
-
-  if (as === "video") link.type = "video/mp4";
-  if (as === "audio") link.type = "audio/mpeg";
-
-  document.head.appendChild(link);
-  return link;
-}
-
-function startFullMediaDownload() {
-  if (hasStartedFullDownload) return;
-
-  hasStartedFullDownload = true;
-  const downloads = allMediaAssets().map(startAssetDownload).filter(Boolean);
-  fullDownloadLinks.push(...downloads);
 }
 
 function seededValue(index, salt) {
@@ -1056,7 +967,6 @@ renderLoadingParticles();
 startExploreButton?.addEventListener("click", () => {
   initializeGalleryExperience();
   enterGallery();
-  startFullMediaDownload();
   playBackgroundMusic();
 });
 
