@@ -518,39 +518,10 @@ const backgroundMusic = new Audio();
 backgroundMusic.preload = "auto";
 backgroundMusic.volume = 0.55;
 
-const preloadRule = Object.freeze({
-  imageConcurrency: 8,
-  mobileImageConcurrency: 4,
-  videoConcurrency: 2,
-  mobileVideoConcurrency: 1,
-  audioConcurrency: 2,
-  idleTimeout: 400,
-  videoWarmupTimeout: 14000,
-  audioWarmupTimeout: 14000
-});
-
-const mediaPreloadState = {
-  isStarted: false,
-  imageCache: new Map(),
-  videoCache: new Map(),
-  videoElements: new Map(),
-  audioCache: new Map(),
-  audioElements: new Map(),
-  imagePreloadPromise: null,
-  videoPreloadPromise: null,
-  audioPreloadPromise: null,
-  allPreloadPromise: null,
-  imagesLoaded: 0,
-  videosLoaded: 0,
-  audioLoaded: 0,
-  imagesTotal: 0,
-  videosTotal: 0,
-  audioTotal: 0
-};
-
 let isGalleryRendered = false;
 let isExperienceInitialized = false;
-const urgentPreloadLinks = new Map();
+let hasStartedFullDownload = false;
+const fullDownloadElements = [];
 
 const staticImageAssets = [
   assetPath("artworks/loading-cover.webp"),
@@ -596,280 +567,63 @@ function audioAssets() {
   return uniqueAssets(musicTracks.map((track) => assetPath(track.src)));
 }
 
-function getImagePreloadConcurrency() {
-  return mobileSwipeMedia.matches ? preloadRule.mobileImageConcurrency : preloadRule.imageConcurrency;
+function allMediaAssets() {
+  return uniqueAssets([
+    ...staticImageAssets,
+    ...artworkImageAssets(),
+    ...artworkVideoAssets(),
+    ...audioAssets()
+  ]);
 }
 
-function getVideoPreloadConcurrency() {
-  return mobileSwipeMedia.matches ? preloadRule.mobileVideoConcurrency : preloadRule.videoConcurrency;
+function isImageAsset(src) {
+  return /\.(png|webp|jpe?g|gif|svg)(?:[?#].*)?$/i.test(src);
 }
 
-function runPreloadQueue(items, worker, concurrency) {
-  if (items.length === 0) return Promise.resolve();
-
-  let nextIndex = 0;
-  const workerCount = Math.min(concurrency, items.length);
-  const workers = Array.from({ length: workerCount }, async () => {
-    while (nextIndex < items.length) {
-      const item = items[nextIndex];
-      nextIndex += 1;
-      await worker(item);
-    }
-  });
-
-  return Promise.all(workers);
+function isVideoAsset(src) {
+  return /\.mp4(?:[?#].*)?$/i.test(src);
 }
 
-function schedulePreloadWork(callback) {
-  if ("requestIdleCallback" in window) {
-    window.requestIdleCallback(callback, { timeout: preloadRule.idleTimeout });
-    return;
-  }
-
-  window.setTimeout(callback, 0);
+function isAudioAsset(src) {
+  return /\.mp3(?:[?#].*)?$/i.test(src);
 }
 
-function markImagePreloaded() {
-  mediaPreloadState.imagesLoaded += 1;
-}
-
-function markVideoPreloaded() {
-  mediaPreloadState.videosLoaded += 1;
-}
-
-function markAudioPreloaded() {
-  mediaPreloadState.audioLoaded += 1;
-}
-
-function setImageFetchPriority(image, fetchPriority) {
-  if (!fetchPriority || fetchPriority === "auto") return;
-
-  if ("fetchPriority" in image) {
-    image.fetchPriority = fetchPriority;
-    return;
-  }
-
-  image.setAttribute("fetchpriority", fetchPriority);
-}
-
-function setMediaFetchPriority(media, fetchPriority) {
-  if (!fetchPriority || fetchPriority === "auto") {
-    media.removeAttribute("fetchpriority");
-    return;
-  }
-
-  media.setAttribute("fetchpriority", fetchPriority);
-}
-
-function prioritizeAsset(src, as) {
-  if (!src || urgentPreloadLinks.has(src)) return;
-
-  const link = document.createElement("link");
-  link.rel = "preload";
-  link.href = src;
-  link.as = as;
-  link.fetchPriority = "high";
-  link.setAttribute("fetchpriority", "high");
-
-  if (as === "video") {
-    link.type = "video/mp4";
-  }
-
-  document.head.appendChild(link);
-  urgentPreloadLinks.set(src, link);
-}
-
-function getImagePreloadEntry(src, fetchPriority = "auto") {
-  if (mediaPreloadState.imageCache.has(src)) {
-    const entry = mediaPreloadState.imageCache.get(src);
-    setImageFetchPriority(entry.image, fetchPriority);
-    return entry;
-  }
-
-  const image = new Image();
-  let isSettled = false;
-  const entry = {
-    image,
-    isLoaded: false,
-    isDecoded: false,
-    decodePromise: null,
-    loadPromise: null
-  };
-
-  entry.loadPromise = new Promise((resolve) => {
-    const complete = (isLoaded) => {
-      if (isSettled) return;
-      isSettled = true;
-      image.onload = null;
-      image.onerror = null;
-      entry.isLoaded = isLoaded;
-
-      resolve({ src, isLoaded });
-    };
-
+function startAssetDownload(src) {
+  if (isImageAsset(src)) {
+    const image = new Image();
     image.decoding = "async";
     image.loading = "eager";
-    setImageFetchPriority(image, fetchPriority);
-    image.onload = () => complete(true);
-    image.onerror = () => complete(false);
     image.src = src;
-
-    if (image.complete) {
-      complete(true);
-    }
-  }).then((result) => {
-    markImagePreloaded();
-    return result;
-  });
-
-  mediaPreloadState.imageCache.set(src, entry);
-  return entry;
-}
-
-function preloadImageAsset(src, shouldDecode = false, fetchPriority = "auto") {
-  const entry = getImagePreloadEntry(src, fetchPriority);
-
-  return entry.loadPromise.then(async (result) => {
-    if (result.isLoaded && shouldDecode && entry.image.decode) {
-      entry.decodePromise = entry.decodePromise || entry.image.decode().catch(() => {});
-      await entry.decodePromise;
-    }
-
-    if (result.isLoaded && shouldDecode) {
-      entry.isDecoded = true;
-    }
-
-    return result;
-  });
-}
-
-function isImageReady(src) {
-  const entry = mediaPreloadState.imageCache.get(src);
-  return entry?.isLoaded === true || entry?.isDecoded === true;
-}
-
-function preloadVideoAsset(src, fetchPriority = "auto") {
-  if (mediaPreloadState.videoCache.has(src)) {
-    const promise = mediaPreloadState.videoCache.get(src);
-    const video = mediaPreloadState.videoElements.get(src);
-    if (video) setMediaFetchPriority(video, fetchPriority);
-    return promise;
+    return image;
   }
 
-  const promise = new Promise((resolve) => {
+  if (isVideoAsset(src)) {
     const video = document.createElement("video");
-    let isSettled = false;
-
-    const finish = (isLoaded) => {
-      if (isSettled) return;
-      isSettled = true;
-      window.clearTimeout(timeoutId);
-      video.removeEventListener("canplaythrough", handleLoaded);
-      video.removeEventListener("loadeddata", handleLoaded);
-      video.removeEventListener("error", handleError);
-      resolve({ src, isLoaded });
-    };
-
-    const handleLoaded = () => finish(true);
-    const handleError = () => finish(false);
-    const timeoutId = window.setTimeout(() => finish(video.readyState > 0), preloadRule.videoWarmupTimeout);
-
     keepVideoSilent(video);
     video.playsInline = true;
     video.preload = "auto";
-    setMediaFetchPriority(video, fetchPriority);
-    video.addEventListener("canplaythrough", handleLoaded);
-    video.addEventListener("loadeddata", handleLoaded);
-    video.addEventListener("error", handleError);
     video.src = src;
-    mediaPreloadState.videoElements.set(src, video);
     video.load();
-  }).then((result) => {
-    markVideoPreloaded();
-    return result;
-  });
-
-  mediaPreloadState.videoCache.set(src, promise);
-  return promise;
-}
-
-function preloadAudioAsset(src) {
-  if (mediaPreloadState.audioCache.has(src)) {
-    return mediaPreloadState.audioCache.get(src);
+    return video;
   }
 
-  const promise = new Promise((resolve) => {
+  if (isAudioAsset(src)) {
     const audio = new Audio();
-    let isSettled = false;
-
-    const finish = (isLoaded) => {
-      if (isSettled) return;
-      isSettled = true;
-      window.clearTimeout(timeoutId);
-      audio.removeEventListener("canplaythrough", handleLoaded);
-      audio.removeEventListener("loadeddata", handleLoaded);
-      audio.removeEventListener("error", handleError);
-      resolve({ src, isLoaded });
-    };
-
-    const handleLoaded = () => finish(true);
-    const handleError = () => finish(false);
-    const timeoutId = window.setTimeout(() => finish(audio.readyState > 0), preloadRule.audioWarmupTimeout);
-
     audio.preload = "auto";
-    audio.addEventListener("canplaythrough", handleLoaded);
-    audio.addEventListener("loadeddata", handleLoaded);
-    audio.addEventListener("error", handleError);
     audio.src = src;
-    mediaPreloadState.audioElements.set(src, audio);
     audio.load();
-  }).then((result) => {
-    markAudioPreloaded();
-    return result;
-  });
+    return audio;
+  }
 
-  mediaPreloadState.audioCache.set(src, promise);
-  return promise;
+  return null;
 }
 
-function beginSiteMediaPreload() {
-  if (mediaPreloadState.isStarted) return mediaPreloadState.allPreloadPromise;
+function startFullMediaDownload() {
+  if (hasStartedFullDownload) return;
 
-  mediaPreloadState.isStarted = true;
-
-  const imageAssets = uniqueAssets([...staticImageAssets, ...artworkImageAssets()]);
-  const videoAssets = artworkVideoAssets();
-  const musicAssets = audioAssets();
-
-  mediaPreloadState.imagesTotal = imageAssets.length;
-  mediaPreloadState.videosTotal = videoAssets.length;
-  mediaPreloadState.audioTotal = musicAssets.length;
-
-  mediaPreloadState.imagePreloadPromise = runPreloadQueue(
-    imageAssets,
-    (src) => preloadImageAsset(src),
-    getImagePreloadConcurrency()
-  );
-
-  mediaPreloadState.videoPreloadPromise = runPreloadQueue(
-    videoAssets,
-    preloadVideoAsset,
-    getVideoPreloadConcurrency()
-  );
-
-  mediaPreloadState.audioPreloadPromise = runPreloadQueue(
-    musicAssets,
-    preloadAudioAsset,
-    preloadRule.audioConcurrency
-  );
-
-  mediaPreloadState.allPreloadPromise = Promise.allSettled([
-    mediaPreloadState.imagePreloadPromise,
-    mediaPreloadState.videoPreloadPromise,
-    mediaPreloadState.audioPreloadPromise
-  ]);
-
-  return mediaPreloadState.allPreloadPromise;
+  hasStartedFullDownload = true;
+  const downloads = allMediaAssets().map(startAssetDownload).filter(Boolean);
+  fullDownloadElements.push(...downloads);
 }
 
 function seededValue(index, salt) {
@@ -932,27 +686,18 @@ function beginMediaSwitch(previousArtwork) {
   window.clearTimeout(switchTimer);
   window.clearTimeout(transitionCleanupTimer);
 
-  const hasVisibleMedia =
-    heroImage.classList.contains("is-visible") || heroVideo.classList.contains("is-visible");
-  if (!stageTransition || !hasVisibleMedia || !previousArtwork) return;
+  if (!stageTransition || !previousArtwork) return;
 
-  stageTransition.style.backgroundImage = `url("${imagePath(previousArtwork)}")`;
-  stageTransition.classList.remove("is-fading");
-  stageTransition.classList.add("is-visible");
-  stageTransition.getBoundingClientRect();
+  stageTransition.classList.remove("is-visible", "is-fading");
+  stageTransition.style.backgroundImage = "";
 }
 
 function hideTransitionOverlay() {
   if (!stageTransition || !stageTransition.classList.contains("is-visible")) return;
 
   window.clearTimeout(transitionCleanupTimer);
-  window.requestAnimationFrame(() => {
-    stageTransition.classList.add("is-fading");
-    transitionCleanupTimer = window.setTimeout(() => {
-      stageTransition.classList.remove("is-visible", "is-fading");
-      stageTransition.style.backgroundImage = "";
-    }, 820);
-  });
+  stageTransition.classList.remove("is-visible", "is-fading");
+  stageTransition.style.backgroundImage = "";
 }
 
 function finishMediaSwitch(activeElement, displayedIndex) {
@@ -974,29 +719,24 @@ function stopHeroVideo() {
   heroVideo.pause();
   heroVideo.removeAttribute("src");
   heroVideo.removeAttribute("poster");
-  heroVideo.removeAttribute("fetchpriority");
   heroVideo.load();
 }
 
 function showImageArtwork(artwork, switchId, artworkIndex) {
+  if (switchId !== mediaSwitchId) return;
+
   const nextSrc = imagePath(artwork);
 
-  prioritizeAsset(nextSrc, "image");
-  preloadImageAsset(nextSrc, true, "high").then(({ isLoaded }) => {
-    if (!isLoaded) return;
-    if (switchId !== mediaSwitchId) return;
-
-    stopHeroVideo();
-    heroImage.src = nextSrc;
-    heroImage.alt = cleanTitle(artwork);
-    finishMediaSwitch(heroImage, artworkIndex);
-  });
+  stopHeroVideo();
+  heroImage.src = nextSrc;
+  heroImage.alt = cleanTitle(artwork);
+  finishMediaSwitch(heroImage, artworkIndex);
 }
 
 function showVideoArtwork(artwork, switchId, artworkIndex) {
+  if (switchId !== mediaSwitchId) return;
+
   const nextSrc = videoPath(artwork);
-  let isVideoReady = false;
-  let isVideoVisible = false;
 
   const playVideo = () => {
     const playPromise = heroVideo.play();
@@ -1005,13 +745,24 @@ function showVideoArtwork(artwork, switchId, artworkIndex) {
     }
   };
 
-  const revealVideo = () => {
-    if (switchId !== mediaSwitchId || !isVideoReady) return;
+  stopHeroVideo();
+  keepVideoSilent(heroVideo);
+  heroVideo.preload = "auto";
+  heroVideo.removeAttribute("poster");
+  heroVideo.src = nextSrc;
+  heroVideo.load();
+  finishMediaSwitch(heroVideo, artworkIndex);
+  playVideo();
 
-    isVideoVisible = true;
-    finishMediaSwitch(heroVideo, artworkIndex);
-    playVideo();
-  };
+  heroVideo.addEventListener(
+    "loadeddata",
+    () => {
+      if (switchId === mediaSwitchId) {
+        playVideo();
+      }
+    },
+    { once: true }
+  );
 
   heroVideo.addEventListener(
     "error",
@@ -1022,24 +773,6 @@ function showVideoArtwork(artwork, switchId, artworkIndex) {
     },
     { once: true }
   );
-
-  heroVideo.addEventListener(
-    "loadeddata",
-    () => {
-      isVideoReady = true;
-      revealVideo();
-    },
-    { once: true }
-  );
-
-  keepVideoSilent(heroVideo);
-  heroVideo.preload = "auto";
-  heroVideo.removeAttribute("poster");
-  setMediaFetchPriority(heroVideo, "high");
-  prioritizeAsset(nextSrc, "video");
-  heroVideo.src = nextSrc;
-  heroVideo.load();
-  preloadVideoAsset(nextSrc, "high");
 }
 
 function renderGallery() {
@@ -1060,7 +793,7 @@ function renderGallery() {
         srcset="${thumbPath(artwork, 240)} 240w, ${thumbPath(artwork, 480)} 480w"
         sizes="(max-width: 768px) 28vw, 158px"
         alt="${cleanTitle(artwork)}"
-        loading="${index < 4 ? "eager" : "lazy"}"
+        loading="eager"
         decoding="async"
       />
       <span>${cleanTitle(artwork)}</span>
@@ -1317,12 +1050,11 @@ function initializeGalleryExperience() {
 }
 
 renderLoadingParticles();
-beginSiteMediaPreload();
 
 startExploreButton?.addEventListener("click", () => {
   initializeGalleryExperience();
   enterGallery();
-  beginSiteMediaPreload();
+  startFullMediaDownload();
   playBackgroundMusic();
 });
 
