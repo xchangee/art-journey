@@ -1,4 +1,12 @@
 const basePath = "artworks/";
+const assetVersion = "";
+
+function assetPath(path) {
+  if (!assetVersion) return path;
+
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}v=${assetVersion}`;
+}
 
 const artworks = [
   {
@@ -488,6 +496,24 @@ let railScrollTimer;
 let railIntroTimer;
 let activeMusicIndex = 0;
 
+const mobileSwipeMedia = window.matchMedia("(max-width: 760px)");
+const swipeRule = Object.freeze({
+  minDistance: 48,
+  maxOffAxisDistance: 96,
+  minAxisRatio: 1.35,
+  intentDistance: 12,
+  maxDuration: 900
+});
+const stageSwipeGesture = {
+  isTracking: false,
+  isHorizontal: false,
+  startX: 0,
+  startY: 0,
+  lastX: 0,
+  lastY: 0,
+  startedAt: 0
+};
+
 const backgroundMusic = new Audio();
 backgroundMusic.preload = "auto";
 backgroundMusic.volume = 0.55;
@@ -512,16 +538,21 @@ const mediaPreloadState = {
 };
 
 const staticImageAssets = [
-  "artworks/loading-cover.png",
-  "artworks/art-journey-preview.png"
+  assetPath("artworks/loading-cover.webp"),
+  assetPath("artworks/loading-cover-mobile.webp"),
+  assetPath("artworks/art-journey-preview.png")
 ];
 
 function imagePath(artwork) {
-  return `${basePath}${artwork.file}`;
+  return assetPath(`${basePath}${artwork.file}`);
 }
 
 function videoPath(artwork) {
-  return `${basePath}${artwork.video}`;
+  return assetPath(`${basePath}${artwork.video}`);
+}
+
+function thumbPath(artwork, width) {
+  return assetPath(`${basePath}thumbs/${artwork.file.replace(/\.png$/, `-${width}.webp`)}`);
 }
 
 function keepVideoSilent(video) {
@@ -872,7 +903,14 @@ function renderGallery() {
     thumb.dataset.index = String(index);
     thumb.setAttribute("aria-label", `查看作品：${cleanTitle(artwork)}`);
     thumb.innerHTML = `
-      <img src="${imagePath(artwork)}" alt="${cleanTitle(artwork)}" loading="${index < 7 ? "eager" : "lazy"}" />
+      <img
+        src="${thumbPath(artwork, 240)}"
+        srcset="${thumbPath(artwork, 240)} 240w, ${thumbPath(artwork, 480)} 480w"
+        sizes="(max-width: 768px) 28vw, 158px"
+        alt="${cleanTitle(artwork)}"
+        loading="${index < 4 ? "eager" : "lazy"}"
+        decoding="async"
+      />
       <span>${cleanTitle(artwork)}</span>
     `;
     thumbs.appendChild(thumb);
@@ -923,7 +961,7 @@ function showInitialRailHint() {
 
 function setMusicTrack(index) {
   activeMusicIndex = (index + musicTracks.length) % musicTracks.length;
-  backgroundMusic.src = musicTracks[activeMusicIndex].src;
+  backgroundMusic.src = assetPath(musicTracks[activeMusicIndex].src);
   backgroundMusic.load();
   updateMusicPlayer();
 }
@@ -1011,6 +1049,103 @@ function setActiveArtwork(index, shouldScroll = true) {
   });
 }
 
+function resetStageSwipeGesture() {
+  stageSwipeGesture.isTracking = false;
+  stageSwipeGesture.isHorizontal = false;
+}
+
+function isSwipeIgnoredTarget(target) {
+  if (!(target instanceof Element)) return false;
+
+  return Boolean(
+    target.closest(
+      "#gallery, button, a, input, textarea, select, summary, [contenteditable='true']"
+    )
+  );
+}
+
+function handleStageTouchStart(event) {
+  if (!mobileSwipeMedia.matches || event.touches.length !== 1 || isSwipeIgnoredTarget(event.target)) {
+    resetStageSwipeGesture();
+    return;
+  }
+
+  const touch = event.touches[0];
+  stageSwipeGesture.isTracking = true;
+  stageSwipeGesture.isHorizontal = false;
+  stageSwipeGesture.startX = touch.clientX;
+  stageSwipeGesture.startY = touch.clientY;
+  stageSwipeGesture.lastX = touch.clientX;
+  stageSwipeGesture.lastY = touch.clientY;
+  stageSwipeGesture.startedAt = performance.now();
+}
+
+function handleStageTouchMove(event) {
+  if (!stageSwipeGesture.isTracking || event.touches.length !== 1) {
+    resetStageSwipeGesture();
+    return;
+  }
+
+  const touch = event.touches[0];
+  const deltaX = touch.clientX - stageSwipeGesture.startX;
+  const deltaY = touch.clientY - stageSwipeGesture.startY;
+  const absX = Math.abs(deltaX);
+  const absY = Math.abs(deltaY);
+
+  stageSwipeGesture.lastX = touch.clientX;
+  stageSwipeGesture.lastY = touch.clientY;
+
+  if (!stageSwipeGesture.isHorizontal && absX >= swipeRule.intentDistance && absX > absY * 1.1) {
+    stageSwipeGesture.isHorizontal = true;
+  }
+
+  if (stageSwipeGesture.isHorizontal && event.cancelable) {
+    event.preventDefault();
+  }
+}
+
+function handleStageTouchEnd(event) {
+  if (!stageSwipeGesture.isTracking) return;
+
+  const touch = event.changedTouches[0];
+  const endX = touch?.clientX ?? stageSwipeGesture.lastX;
+  const endY = touch?.clientY ?? stageSwipeGesture.lastY;
+  const deltaX = endX - stageSwipeGesture.startX;
+  const deltaY = endY - stageSwipeGesture.startY;
+  const absX = Math.abs(deltaX);
+  const absY = Math.abs(deltaY);
+  const duration = performance.now() - stageSwipeGesture.startedAt;
+  const isValidSwipe =
+    duration <= swipeRule.maxDuration &&
+    absX >= swipeRule.minDistance &&
+    absY <= swipeRule.maxOffAxisDistance &&
+    absX >= absY * swipeRule.minAxisRatio;
+
+  resetStageSwipeGesture();
+
+  if (!mobileSwipeMedia.matches || !isValidSwipe) return;
+
+  setActiveArtwork(deltaX < 0 ? activeIndex + 1 : activeIndex - 1);
+}
+
+function preventMobileGestureZoom(event) {
+  if (event.cancelable) {
+    event.preventDefault();
+  }
+}
+
+function preventMobileMultiTouch(event) {
+  if (event.touches?.length > 1 && event.cancelable) {
+    event.preventDefault();
+  }
+}
+
+function preventMobileDoubleTapZoom(event) {
+  if (mobileSwipeMedia.matches && event.cancelable) {
+    event.preventDefault();
+  }
+}
+
 renderGallery();
 renderLoadingParticles();
 setActiveArtwork(0, false);
@@ -1039,6 +1174,17 @@ pager.addEventListener("click", (event) => {
 });
 
 nextButton.addEventListener("click", () => setActiveArtwork(activeIndex + 1));
+
+mainStage.addEventListener("touchstart", handleStageTouchStart, { passive: true });
+mainStage.addEventListener("touchmove", handleStageTouchMove, { passive: false });
+mainStage.addEventListener("touchend", handleStageTouchEnd, { passive: true });
+mainStage.addEventListener("touchcancel", resetStageSwipeGesture, { passive: true });
+
+document.addEventListener("touchmove", preventMobileMultiTouch, { passive: false });
+document.addEventListener("dblclick", preventMobileDoubleTapZoom, { passive: false });
+document.addEventListener("gesturestart", preventMobileGestureZoom, { passive: false });
+document.addEventListener("gesturechange", preventMobileGestureZoom, { passive: false });
+document.addEventListener("gestureend", preventMobileGestureZoom, { passive: false });
 
 musicPlayer.addEventListener("click", () => {
   if (!backgroundMusic.paused) {

@@ -20,21 +20,28 @@ html {
   height: 100%;
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow: hidden;
+  overscroll-behavior: none;
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
+  position: fixed;
+  inset: 0;
   min-height: 100%;
+  height: 100%;
   width: 100%;
   max-width: 100%;
   margin: 0;
   display: block;
   overflow: hidden;
-  overscroll-behavior-x: none;
+  overscroll-behavior: none;
   background: #050403;
   color: var(--text);
   font-family: var(--serif);
+  touch-action: manipulation;
 }
 
 button,
@@ -43,7 +50,17 @@ input {
 }
 
 button {
+  appearance: none;
+  -webkit-appearance: none;
   color: inherit;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
 }
 
 a {
@@ -71,14 +88,24 @@ a {
   overflow: hidden;
   background:
     linear-gradient(rgba(6, 5, 2, 0.08), rgba(6, 5, 2, 0.08)),
-    url("artworks/loading-cover.png") center / cover no-repeat,
+    url("artworks/loading-cover.webp") center / cover no-repeat,
     #090704;
   opacity: 1;
+  touch-action: none;
   transform: scale(1);
   transition:
     opacity 820ms ease,
     transform 1100ms ease,
     visibility 820ms ease;
+}
+
+@media (max-width: 768px) {
+  .loading-screen {
+    background:
+      linear-gradient(rgba(6, 5, 2, 0.08), rgba(6, 5, 2, 0.08)),
+      url("artworks/loading-cover-mobile.webp") center / cover no-repeat,
+      #090704;
+  }
 }
 
 .loading-screen::before,
@@ -238,6 +265,8 @@ a {
 }
 
 .loading-screen__label {
+  flex: 0 0 auto;
+  white-space: nowrap;
   transform: translateY(-1px);
 }
 
@@ -347,6 +376,9 @@ a {
   overflow: hidden;
   background: var(--dark);
   box-shadow: none;
+  touch-action: pan-x;
+  user-select: none;
+  -webkit-user-select: none;
   --stage-pad-x: clamp(24px, 4.4cqw, 84px);
   --stage-pad-y: clamp(16px, 4.1cqh, 42px);
   --copy-left: clamp(44px, 7.2cqw, 110px);
@@ -938,7 +970,9 @@ a {
   min-width: 0;
   padding: clamp(7px, 1.55cqh, 17px) var(--stage-pad-x) clamp(10px, 2.25cqh, 24px);
   overflow: hidden;
+  overscroll-behavior: contain;
   pointer-events: auto;
+  touch-action: pan-x;
 }
 
 .thumb-track {
@@ -954,6 +988,9 @@ a {
   padding: 3px 0 8px;
   pointer-events: auto;
   scrollbar-width: none;
+  overscroll-behavior: contain;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
 }
 
 .thumb-track::-webkit-scrollbar {
@@ -1411,7 +1448,7 @@ a {
 
   .stage {
     --mobile-edge: clamp(18px, 5.6vw, 26px);
-    --mobile-rail-height: clamp(112px, 15svh, 132px);
+    --mobile-rail-height: clamp(96px, 12svh, 108px);
     --mobile-action-size: clamp(48px, 13.5vw, 56px);
 
     width: 100%;
@@ -1570,8 +1607,8 @@ a {
     bottom: 0;
     left: 0;
     min-height: calc(var(--mobile-rail-height) + env(safe-area-inset-bottom));
-    gap: 8px;
-    padding: 10px 0 max(12px, env(safe-area-inset-bottom));
+    gap: 0;
+    padding: 10px 0 max(14px, env(safe-area-inset-bottom));
     background: linear-gradient(180deg, transparent, rgba(5, 4, 3, 0.42) 18%, rgba(5, 4, 3, 0.72));
   }
 
@@ -1590,10 +1627,7 @@ a {
   }
 
   .pager {
-    justify-content: flex-start;
-    gap: 9px;
-    overflow: hidden;
-    padding: 0 var(--mobile-edge);
+    display: none;
   }
 
   .pager button {
@@ -1602,6 +1636,30 @@ a {
 }
 
 @media (max-width: 420px) {
+  .loading-screen__start {
+    width: min(82vw, 282px);
+    min-width: 0;
+    min-height: 58px;
+    gap: clamp(8px, 2.4vw, 10px);
+    padding: 0 clamp(18px, 5vw, 24px);
+    font-size: clamp(22px, 6.2vw, 28px);
+  }
+
+  .loading-screen__ornament {
+    width: 14px;
+    height: 14px;
+  }
+
+  .loading-screen__ornament::before {
+    width: 7px;
+    height: 7px;
+  }
+
+  .loading-screen__start svg {
+    width: 24px;
+    height: 24px;
+  }
+
   .hero-copy {
     bottom: calc(var(--mobile-rail-height) + 30px);
     width: calc(100vw - (var(--mobile-edge) * 2) - var(--mobile-action-size) - 14px);

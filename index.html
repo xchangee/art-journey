@@ -2,7 +2,10 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <meta
       name="description"
       content="Art Journey 沉浸式名画网页，使用本地 artworks 文件夹图片构建响应式画廊。"
@@ -12,7 +15,20 @@
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23110f08'/%3E%3Cpath d='M13 26h38M17 29v19M27 29v19M37 29v19M47 29v19M13 51h38M16 21 32 13l16 8M20 23h24' fill='none' stroke='%23f8edbc' stroke-width='4' stroke-linecap='square' stroke-linejoin='round'/%3E%3C/svg%3E"
     />
     <title>Art Journey|小阿噗沉浸式画廊</title>
-    <link rel="preload" as="image" href="artworks/loading-cover.png" />
+    <link
+      rel="preload"
+      as="image"
+      href="artworks/loading-cover.webp"
+      type="image/webp"
+      media="(min-width: 769px)"
+    />
+    <link
+      rel="preload"
+      as="image"
+      href="artworks/loading-cover-mobile.webp"
+      type="image/webp"
+      media="(max-width: 768px)"
+    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
