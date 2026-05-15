@@ -2,6 +2,20 @@ node_modules/
 dist/
 .DS_Store
 artworks/*.mp4
+!artworks/a-sunday-afternoon-on-the-island-of-la-grande-jatte.mp4
+!artworks/ancient-pastoral-scroll.mp4
+!artworks/birds-and-plum-blossoms.mp4
+!artworks/boating-on-the-seine.mp4
+!artworks/cafe-terrace-at-night.mp4
+!artworks/dwellings-by-the-stream.mp4
+!artworks/fishing-boats-at-sea.mp4
+!artworks/luncheon-of-the-boating-party.mp4
+!artworks/napoleon-crossing-the-alps-alternate.mp4
 !artworks/sunflowers.mp4
+!artworks/the-dream.mp4
+!artworks/the-gleaners.mp4
+!artworks/the-luncheon-on-the-grass.mp4
 !artworks/the-third-class-carriage.mp4
+!artworks/two-women-at-the-window.mp4
+!artworks/young-woman-in-the-garden.mp4
 ChatGPT Image*.png

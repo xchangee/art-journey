@@ -12,6 +12,7 @@ const artworks = [
   },
   {
     file: "cafe-terrace-at-night.png",
+    video: "cafe-terrace-at-night.mp4",
     title: "夜 间 咖 啡 馆",
     artist: "VINCENT VAN GOGH",
     year: "1888",
@@ -20,6 +21,7 @@ const artworks = [
   },
   {
     file: "a-sunday-afternoon-on-the-island-of-la-grande-jatte.png",
+    video: "a-sunday-afternoon-on-the-island-of-la-grande-jatte.mp4",
     title: "大 碗 岛",
     artist: "GEORGES SEURAT",
     year: "1886",
@@ -51,7 +53,8 @@ const artworks = [
     description: "练功房里的光、裙摆与姿态凝成瞬间，舞者的等待也成为表演。"
   },
   {
-    file: "napoleon-crossing-the-alps.png",
+    file: "napoleon-crossing-the-alps-alternate.png",
+    video: "napoleon-crossing-the-alps-alternate.mp4",
     title: "拿 破 仑",
     artist: "JACQUES-LOUIS DAVID",
     year: "1801",
@@ -84,6 +87,7 @@ const artworks = [
   },
   {
     file: "ancient-pastoral-scroll.png",
+    video: "ancient-pastoral-scroll.mp4",
     title: "古 卷 牧 歌",
     artist: "CHINESE HANDSCROLL",
     year: "宋元时期",
@@ -100,6 +104,7 @@ const artworks = [
   },
   {
     file: "the-gleaners.png",
+    video: "the-gleaners.mp4",
     title: "拾 穗 者",
     artist: "JEAN-FRANÇOIS MILLET",
     year: "1857",
@@ -124,6 +129,7 @@ const artworks = [
   },
   {
     file: "dwellings-by-the-stream.png",
+    video: "dwellings-by-the-stream.mp4",
     title: "溪 岸 人 家",
     artist: "CHINESE LANDSCAPE",
     year: "明代",
@@ -156,6 +162,7 @@ const artworks = [
   },
   {
     file: "the-luncheon-on-the-grass.png",
+    video: "the-luncheon-on-the-grass.mp4",
     title: "草 地 上 的 午 餐",
     artist: "ÉDOUARD MANET",
     year: "1863",
@@ -180,6 +187,7 @@ const artworks = [
   },
   {
     file: "luncheon-of-the-boating-party.png",
+    video: "luncheon-of-the-boating-party.mp4",
     title: "船 上 午 宴",
     artist: "PIERRE-AUGUSTE RENOIR",
     year: "1881",
@@ -220,6 +228,7 @@ const artworks = [
   },
   {
     file: "the-dream.png",
+    video: "the-dream.mp4",
     title: "热 带 雨 林",
     artist: "HENRI ROUSSEAU",
     year: "1910",
@@ -228,6 +237,7 @@ const artworks = [
   },
   {
     file: "napoleon-crossing-the-alps-alternate.png",
+    video: "napoleon-crossing-the-alps-alternate.mp4",
     title: "拿 破 仑 雪 径",
     artist: "JACQUES-LOUIS DAVID",
     year: "1801",
@@ -251,7 +261,7 @@ const artworks = [
     description: "人物穿行于山石与松影之间，叙事像从画卷边缘轻声走来。"
   },
   {
-    file: "the-angelus.png",
+    file: "the-angelus-alternate.png",
     title: "晚 钟",
     artist: "JEAN-FRANÇOIS MILLET",
     year: "1857",
@@ -267,7 +277,8 @@ const artworks = [
     description: "宏大的宫廷仪式被推至舞台中央，权力、秩序与凝视在光线中层层展开。"
   },
   {
-    file: "cafe-terrace-at-night-alternate.png",
+    file: "cafe-terrace-at-night.png",
+    video: "cafe-terrace-at-night.mp4",
     title: "夜 间 咖 啡 馆",
     artist: "VINCENT VAN GOGH",
     year: "1888",
@@ -292,6 +303,7 @@ const artworks = [
   },
   {
     file: "birds-and-plum-blossoms.png",
+    video: "birds-and-plum-blossoms.mp4",
     title: "花 鸟 枝 影",
     artist: "CHINESE FLOWER-AND-BIRD PAINTING",
     year: "明清风格",
@@ -332,6 +344,7 @@ const artworks = [
   },
   {
     file: "fishing-boats-at-sea.png",
+    video: "fishing-boats-at-sea.mp4",
     title: "海 上 渔 船",
     artist: "WILLIAM TURNER",
     year: "1796",
@@ -340,6 +353,7 @@ const artworks = [
   },
   {
     file: "young-woman-in-the-garden.png",
+    video: "young-woman-in-the-garden.mp4",
     title: "花 园 少 女",
     artist: "BERTHE MORISOT",
     year: "1880",
@@ -381,6 +395,7 @@ const artworks = [
   },
   {
     file: "boating-on-the-seine.png",
+    video: "boating-on-the-seine.mp4",
     title: "塞 纳 河 泛 舟",
     artist: "PIERRE-AUGUSTE RENOIR",
     year: "1879",
@@ -413,6 +428,7 @@ const artworks = [
   },
   {
     file: "two-women-at-the-window.png",
+    video: "two-women-at-the-window.mp4",
     title: "窗 边 女 子",
     artist: "BARTOLOMÉ ESTEBAN MURILLO",
     year: "1670",
