@@ -521,7 +521,7 @@ backgroundMusic.volume = 0.55;
 let isGalleryRendered = false;
 let isExperienceInitialized = false;
 let hasStartedFullDownload = false;
-const fullDownloadElements = [];
+const fullDownloadLinks = [];
 
 const staticImageAssets = [
   assetPath("artworks/loading-cover.webp"),
@@ -588,34 +588,36 @@ function isAudioAsset(src) {
   return /\.mp3(?:[?#].*)?$/i.test(src);
 }
 
-function startAssetDownload(src) {
+function assetHintType(src) {
   if (isImageAsset(src)) {
-    const image = new Image();
-    image.decoding = "async";
-    image.loading = "eager";
-    image.src = src;
-    return image;
+    return "image";
   }
 
   if (isVideoAsset(src)) {
-    const video = document.createElement("video");
-    keepVideoSilent(video);
-    video.playsInline = true;
-    video.preload = "auto";
-    video.src = src;
-    video.load();
-    return video;
+    return "video";
   }
 
   if (isAudioAsset(src)) {
-    const audio = new Audio();
-    audio.preload = "auto";
-    audio.src = src;
-    audio.load();
-    return audio;
+    return "audio";
   }
 
   return null;
+}
+
+function startAssetDownload(src) {
+  const as = assetHintType(src);
+  if (!as) return null;
+
+  const link = document.createElement("link");
+  link.rel = "prefetch";
+  link.href = src;
+  link.as = as;
+
+  if (as === "video") link.type = "video/mp4";
+  if (as === "audio") link.type = "audio/mpeg";
+
+  document.head.appendChild(link);
+  return link;
 }
 
 function startFullMediaDownload() {
@@ -623,7 +625,7 @@ function startFullMediaDownload() {
 
   hasStartedFullDownload = true;
   const downloads = allMediaAssets().map(startAssetDownload).filter(Boolean);
-  fullDownloadElements.push(...downloads);
+  fullDownloadLinks.push(...downloads);
 }
 
 function seededValue(index, salt) {
