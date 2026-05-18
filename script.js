@@ -56,6 +56,7 @@ const artworks = [
   },
   {
     file: "the-ballet-class.png",
+    video: "the-ballet-class.mp4",
     title: "舞 蹈 课",
     artist: "EDGAR DEGAS",
     year: "1874",
