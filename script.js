@@ -38,6 +38,7 @@ const artworks = [
   },
   {
     file: "woman-with-fans.png",
+    video: "woman-with-fans.mp4",
     title: "执 扇 女 子",
     artist: "ÉDOUARD MANET",
     year: "1879",
@@ -46,6 +47,7 @@ const artworks = [
   },
   {
     file: "flowers-in-a-crystal-vase.png",
+    video: "flowers-in-a-crystal-vase.mp4",
     title: "玻 璃 花 瓶",
     artist: "ÉDOUARD MANET",
     year: "1882",
@@ -87,6 +89,7 @@ const artworks = [
   },
   {
     file: "woman-with-a-parasol.png",
+    video: "woman-with-a-parasol.mp4",
     title: "撑 伞 女 子",
     artist: "CLAUDE MONET",
     year: "1875",
@@ -146,6 +149,7 @@ const artworks = [
   },
   {
     file: "girl-reading-a-letter-at-an-open-window.png",
+    video: "girl-reading-a-letter-at-an-open-window.mp4",
     title: "阅 读 少 女",
     artist: "JOHANNES VERMEER",
     year: "1657",
@@ -162,6 +166,7 @@ const artworks = [
   },
   {
     file: "court-ladies-preparing-newly-woven-silk.png",
+    video: "court-ladies-preparing-newly-woven-silk.mp4",
     title: "仕 女 行 乐",
     artist: "CHINESE FIGURE PAINTING",
     year: "唐宋风格",
@@ -187,6 +192,7 @@ const artworks = [
   },
   {
     file: "woman-at-a-window.png",
+    video: "woman-at-a-window.mp4",
     title: "倚 窗 少 女",
     artist: "JOHANNES VERMEER",
     year: "1657",
@@ -204,6 +210,7 @@ const artworks = [
   },
   {
     file: "old-man-at-the-window.png",
+    video: "old-man-at-the-window.mp4",
     title: "窗 边 老 人",
     artist: "REMBRANDT VAN RIJN",
     year: "1650",
@@ -212,6 +219,7 @@ const artworks = [
   },
   {
     file: "a-thousand-li-of-rivers-and-mountains.png",
+    video: "a-thousand-li-of-rivers-and-mountains.mp4",
     title: "青 绿 山 水",
     artist: "WANG XIMENG",
     year: "1113",
@@ -228,6 +236,7 @@ const artworks = [
   },
   {
     file: "admonitions-of-the-instructress-to-the-court-ladies.png",
+    video: "admonitions-of-the-instructress-to-the-court-ladies.mp4",
     title: "女 史 箴 图",
     artist: "GU KAIZHI",
     year: "东晋",
@@ -262,6 +271,7 @@ const artworks = [
   },
   {
     file: "visiting-a-friend-in-the-mountains.png",
+    video: "visiting-a-friend-in-the-mountains.mp4",
     title: "远 山 访 友",
     artist: "CHINESE FIGURE PAINTING",
     year: "清代",
@@ -379,6 +389,7 @@ const artworks = [
   },
   {
     file: "along-the-river-during-the-qingming-festival.png",
+    video: "along-the-river-during-the-qingming-festival.mp4",
     title: "清 明 上 河 图",
     artist: "ZHANG ZEDUAN",
     year: "北宋",
@@ -412,6 +423,7 @@ const artworks = [
   },
   {
     file: "farmhouse-in-provence.png",
+    video: "farmhouse-in-provence.mp4",
     title: "普 罗 旺 斯 农 舍",
     artist: "VINCENT VAN GOGH",
     year: "1888",
